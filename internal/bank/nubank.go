@@ -44,6 +44,16 @@ func (n Nubank) GetBill(url string) (*models.Bill, error) {
 		return nil, err
 	}
 
+	if response.StatusCode == 401 {
+		log.Println("unauthorized while getting bill, time to authorize again")
+		err = removeToken()
+		if err != nil {
+			log.Println("error removing token", err)
+		}
+
+		return nil, fmt.Errorf("unauthorized while getting bill")
+	}
+
 	v := new(bytes.Buffer)
 	v.ReadFrom(response.Body)
 
@@ -73,6 +83,15 @@ func (n Nubank) GetBill(url string) (*models.Bill, error) {
 }
 
 func (n Nubank) Authorize() error {
+	loaded, err := loadToken()
+	if err != nil {
+		return err
+	}
+
+	if loaded {
+		return nil
+	}
+
 	discovery := new(discoveryResponse)
 
 	httpClient := &http.Client{}
@@ -85,6 +104,11 @@ func (n Nubank) Authorize() error {
 	response, err := httpClient.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if response.StatusCode != 200 {
+		log.Println("error getting discovery", response.StatusCode)
+		return fmt.Errorf("error getting discovery")
 	}
 
 	err = json.NewDecoder(response.Body).Decode(discovery)
@@ -116,6 +140,11 @@ func (n Nubank) Authorize() error {
 		return err
 	}
 
+	if response.StatusCode != 200 {
+		log.Println("error logging in", response.StatusCode)
+		return fmt.Errorf("error logging in")
+	}
+
 	login := new(authorizeResponse)
 	err = json.NewDecoder(response.Body).Decode(login)
 	if err != nil {
@@ -132,6 +161,11 @@ func (n Nubank) Authorize() error {
 	response, err = httpClient.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if response.StatusCode != 200 {
+		log.Println("error getting discovery app", response.StatusCode)
+		return fmt.Errorf("error getting discovery app")
 	}
 
 	discoveryApp := new(discoveryAppResponse)
@@ -168,6 +202,11 @@ func (n Nubank) Authorize() error {
 		return err
 	}
 
+	if response.StatusCode != 200 {
+		log.Println("error lifting", response.StatusCode)
+		return fmt.Errorf("error lifting")
+	}
+
 	lift := new(liftResponse)
 	err = json.NewDecoder(response.Body).Decode(lift)
 	if err != nil {
@@ -176,6 +215,11 @@ func (n Nubank) Authorize() error {
 
 	accessToken = lift.AccessToken
 	revokeUrl = lift.Links.RevokeToken.Href
+
+	err = storeToken()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
