@@ -1,4 +1,5 @@
-# manager
+![image](https://github.com/reonardoleis/manager/assets/33813822/f30e20bf-c117-4b67-9c8b-dac82d7a1a3d)
+
 💵 Automated extraction and insertion of credit card statement items into my Notion database
 
 - Utilizes the bank's API to efficiently extract credit card statement data
