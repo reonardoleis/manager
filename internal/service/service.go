@@ -11,14 +11,22 @@ type Provider interface {
 	Insert(v *models.Tx) error
 }
 
+type Bank interface {
+	GetBill(url string) (*models.Bill, error)
+	Authorize() error
+	Revoke() error
+}
+
 type Service struct {
 	provider Provider
+	bank     Bank
 	mapper   *models.Mapper
 }
 
-func New(provider Provider, mapper *models.Mapper) Service {
+func New(provider Provider, bank Bank, mapper *models.Mapper) Service {
 	return Service{
 		provider: provider,
+		bank:     bank,
 		mapper:   mapper,
 	}
 }
@@ -43,4 +51,8 @@ func (s Service) Run(txs []models.Tx) error {
 
 	wg.Wait()
 	return nil
+}
+
+func (s Service) GetBill(url string) (*models.Bill, error) {
+	return s.bank.GetBill(url)
 }

@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
+	"github.com/reonardoleis/manager/internal/bank"
 	"github.com/reonardoleis/manager/internal/date"
 	"github.com/reonardoleis/manager/internal/models"
 	provider "github.com/reonardoleis/manager/internal/providers"
@@ -14,31 +16,21 @@ import (
 )
 
 func main() {
-	billFile, err := os.Open("bill.json")
-	if err != nil {
-		panic(err)
-	}
+	godotenv.Overload(".env")
 
-	defer billFile.Close()
-
-	mapperFile, err := os.Open("mappings.json")
+	mapperFile, err := os.Open(os.Getenv("CONFIG_PATH") + "/mappings.json")
 	if err != nil {
 		panic(err)
 	}
 
 	defer mapperFile.Close()
 
-	configFile, err := os.Open("config.json")
+	configFile, err := os.Open(os.Getenv("CONFIG_PATH") + "/config.json")
 	if err != nil {
 		panic(err)
 	}
 
 	defer configFile.Close()
-
-	billContents, err := io.ReadAll(billFile)
-	if err != nil {
-		panic(err)
-	}
 
 	mapperContents, err := io.ReadAll(mapperFile)
 	if err != nil {
@@ -51,15 +43,10 @@ func main() {
 	}
 
 	mapper := &models.Mapper{}
-	bill := &models.Bill{}
+
 	config := &models.Config{}
 
 	err = mapper.FromJSON(string(mapperContents))
-	if err != nil {
-		panic(err)
-	}
-
-	err = bill.FromJSON(string(billContents))
 	if err != nil {
 		panic(err)
 	}
@@ -75,9 +62,28 @@ func main() {
 
 	window := date.Days(*daysFlag)
 
+	bank := bank.NewNubank(config.Cpf, config.Password, config.ClientSecret)
+	defer bank.Revoke()
+
+	err = bank.Authorize()
+	if err != nil {
+		panic(err)
+	}
+
+	notionProvider := provider.NewNotionProvider(mapper, config)
+	service := service.New(notionProvider, bank, mapper)
+
+	bill, err := service.GetBill(config.CreditCardURL)
+	if err != nil {
+		panic(err)
+	}
+
 	txs := bill.TxsWithDate(window)
 
-	question := "The following transactions will be added to Notion:\n" + bill.GetFormattedTitles(window, mapper) + "\nDo you want to proceed? (y/N): "
+	question :=
+		"The following transactions will be added to Notion:\n" +
+			bill.GetFormattedTitles(window, mapper) +
+			"\nDo you want to proceed? (y/N): "
 
 	if len(txs) == 0 {
 		log.Println("No transactions found")
@@ -92,9 +98,6 @@ func main() {
 	if answer != "y" {
 		return
 	}
-
-	notionProvider := provider.NewNotionProvider(mapper, config)
-	service := service.New(notionProvider, mapper)
 
 	err = service.Run(txs)
 	if err != nil {
