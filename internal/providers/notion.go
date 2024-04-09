@@ -2,6 +2,9 @@ package provider
 
 import (
 	"context"
+	"log"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/jomei/notionapi"
@@ -107,17 +110,43 @@ func (n NotionProvider) exists(v *models.Tx) (bool, error) {
 	return false, nil
 }
 
+func (n NotionProvider) Filter(txs []models.Tx) []models.Tx {
+	out := []models.Tx{}
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(txs))
+
+	lock := sync.Mutex{}
+
+	for idx, tx := range txs {
+		go func(idx int, tx models.Tx) {
+			defer wg.Done()
+
+			exists, err := n.exists(&tx)
+			if err != nil {
+				log.Println("error checking if tx exists", tx.Title, idx, err)
+				return
+			}
+
+			if !exists {
+				lock.Lock()
+				out = append(out, tx)
+				lock.Unlock()
+			}
+		}(idx, tx)
+	}
+
+	wg.Wait()
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Idx < out[j].Idx
+	})
+
+	return out
+}
+
 func (n NotionProvider) Insert(v *models.Tx) error {
-	exists, err := n.exists(v)
-	if err != nil {
-		return err
-	}
-
-	if exists {
-		return nil
-	}
-
-	_, err = n.cli.Page.Create(context.Background(), &notionapi.PageCreateRequest{
+	_, err := n.cli.Page.Create(context.Background(), &notionapi.PageCreateRequest{
 		Parent: notionapi.Parent{
 			DatabaseID: notionapi.DatabaseID(n.config.NotionDatabaseID),
 		},

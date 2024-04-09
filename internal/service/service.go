@@ -9,6 +9,7 @@ import (
 
 type Provider interface {
 	Insert(v *models.Tx) error
+	Filter(txs []models.Tx) []models.Tx
 }
 
 type Bank interface {

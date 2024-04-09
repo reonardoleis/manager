@@ -79,6 +79,11 @@ func (n Nubank) GetBill(url string) (*models.Bill, error) {
 
 	b := new(models.Bill)
 	b.Txs = txs
+
+	for idx := range b.Txs {
+		b.Txs[idx].Idx = idx
+	}
+
 	return b, nil
 }
 

@@ -70,16 +70,15 @@ func main() {
 		panic(err)
 	}
 
-	notionProvider := provider.NewNotionProvider(mapper, config)
-	service := service.New(notionProvider, bank, mapper)
+	provider := provider.NewNotionProvider(mapper, config)
+	service := service.New(provider, bank, mapper)
 
 	bill, err := service.GetBill(config.CreditCardURL)
 	if err != nil {
 		panic(err)
 	}
 
-	txs := bill.TxsWithDate(window)
-
+	txs := provider.Filter(bill.TxsWithDate(window))
 	question :=
 		"The following transactions will be added to Notion:\n" +
 			bill.GetFormattedTitles(window, mapper) +
