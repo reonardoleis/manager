@@ -1,6 +1,10 @@
 package service
 
-import "github.com/reonardoleis/manager/internal/models"
+import (
+	"log"
+
+	"github.com/reonardoleis/manager/internal/models"
+)
 
 type Provider interface {
 	Insert(v *models.Tx) error
@@ -19,11 +23,14 @@ func New(provider Provider, mapper *models.Mapper) Service {
 }
 
 func (s Service) Run(txs []models.Tx) error {
-	for _, tx := range txs {
+	log.Println("Inserting", len(txs), "transactions")
+	for idx, tx := range txs {
 		err := s.provider.Insert(&tx)
 		if err != nil {
 			return err
 		}
+
+		log.Println(idx+1, "of", len(txs), "inserted")
 	}
 	return nil
 }

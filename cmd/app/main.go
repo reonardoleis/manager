@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/reonardoleis/manager/internal/date"
@@ -74,6 +76,22 @@ func main() {
 	window := date.Days(*daysFlag)
 
 	txs := bill.TxsWithDate(window)
+
+	question := "The following transactions will be added to Notion:\n" + bill.GetFormattedTitles(window, mapper) + "\nDo you want to proceed? (y/N): "
+
+	if len(txs) == 0 {
+		log.Println("No transactions found")
+		return
+	}
+
+	fmt.Print(question)
+
+	var answer string
+	fmt.Scanln(&answer)
+
+	if answer != "y" {
+		return
+	}
 
 	notionProvider := provider.NewNotionProvider(mapper, config)
 	service := service.New(notionProvider, mapper)
